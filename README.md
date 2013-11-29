@@ -24,7 +24,7 @@ VMware player is free for non commercial use. Refer to the related license for d
 
 
 Setup
-=====
+-----
 
 Deploy OpenStack Havana on your physical laptop / workstation / server or in 
 a virtual machine (e.g. using RDO or DevStack).
@@ -50,7 +50,7 @@ https://my.vmware.com/web/vmware/free#desktop_end_user_computing/vmware_player/6
 
     
 Usage
-=====
+-----
 
 Beside the feature that you'd expect from other Nova drivers, there are a few options specific to this project
 
@@ -98,7 +98,7 @@ The guest OS to be used in case a value is not provided by the Glance image.
 
 
 Example
-=======
+-------
 
 Here's an example about how to create a CentOS template image by providing a CentOS DVD and a 
 kickstart file in a floppy image:
@@ -126,7 +126,7 @@ spawned on other hypervisors.
 
 
 Limitations
-===========
+-----------
 
 Due to the nature of this project, live-migration is not supported as it wouldn't make particularly sense.
 
