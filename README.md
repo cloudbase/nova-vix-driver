@@ -23,8 +23,8 @@ Workstation and Player are supported on Windows and Linux, while Fusion works on
 VMware player is free for non commercial use. Refer to the related license for details.
 
 
-Setup
------
+### Setup
+
 
 Deploy OpenStack Havana on your physical laptop / workstation / server or in 
 a virtual machine (e.g. using RDO or DevStack).
@@ -49,13 +49,12 @@ Vix SDK:
 https://my.vmware.com/web/vmware/free#desktop_end_user_computing/vmware_player/6_0|PLAYER-600-A|drivers_tools
 
     
-Usage
------
+### Usage
+
 
 Beside the feature that you'd expect from other Nova drivers, there are a few options specific to this project
 
-Glance image options
---------------------
+### Glance image options
 
 The following Glance image properties are recognized by the Vix Nova compute driver.
 
@@ -84,8 +83,7 @@ VMware tools ISO image to be attached as a virtual DVDRom drive (e.g. "linux", "
 Device boot order. Default: "hdd,cdrom,floppy"
 
 
-Nova compute options
---------------------
+### Nova compute options
 
 Options that can be specified in the Nova configuration file in the [vix] section:
     show_gui=True
@@ -97,8 +95,7 @@ If true, instance consoles windows will be displayed in WMware Workstation, Play
 The guest OS to be used in case a value is not provided by the Glance image.
 
 
-Example
--------
+### Example
 
 Here's an example about how to create a CentOS template image by providing a CentOS DVD and a 
 kickstart file in a floppy image:
@@ -125,8 +122,7 @@ spawned on other hypervisors.
     nova boot  --flavor 1 --image CentOS-64-template --key-name key1 centos-64-template1
 
 
-Limitations
------------
+### Limitations
 
 Due to the nature of this project, live-migration is not supported as it wouldn't make particularly sense.
 
