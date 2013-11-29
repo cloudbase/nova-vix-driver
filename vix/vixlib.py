@@ -724,6 +724,7 @@ vix.VixVM_CreateSnapshot.argtypes = [VixHandle, ctypes.c_char_p,
                                      ctypes.c_char_p, VixCreateSnapshotOptions,
                                      VixHandle, ctypes.POINTER(VixEventProc),
                                      ctypes.c_void_p]
+VixVM_CreateSnapshot = vix.VixVM_CreateSnapshot
 
 vix.VixVM_EnableSharedFolders.restype = VixHandle
 vix.VixVM_EnableSharedFolders.argtypes = [VixHandle, ctypes.c_byte,

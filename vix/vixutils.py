@@ -272,6 +272,25 @@ class VixVM(object):
 
         self.close()
 
+    def create_snapshot(self, include_memory=False, name=None,
+                        description=None):
+        if include_memory:
+            options = vixlib.VIX_SNAPSHOT_INCLUDE_MEMORY
+        else:
+            options = 0
+
+        job_handle = vixlib.VixVM_CreateSnapshot(self._vm_handle,
+                                                 name, description, options,
+                                                 vixlib.VIX_INVALID_HANDLE,
+                                                 None, None)
+        snapshot_handle = vixlib.VixHandle()
+        err = vixlib.VixJob_Wait(job_handle,
+                                 vixlib.VIX_PROPERTY_JOB_RESULT_HANDLE,
+                                 ctypes.byref(snapshot_handle),
+                                 vixlib.VIX_PROPERTY_NONE)
+        vixlib.Vix_ReleaseHandle(job_handle)
+        _check_job_err_code(err)
+        vixlib.Vix_ReleaseHandle(snapshot_handle)
 
 class VixConnection(object):
     def __init__(self):
