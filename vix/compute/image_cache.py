@@ -46,20 +46,24 @@ class ImageCache(object):
         return image_service.show(context, image_id)
 
     def get_cached_image(self, context, image_id, user_id, project_id):
-        base_vmdk_dir = self._pathutils.get_base_vmdk_dir()
-        vmdk_path = os.path.join(base_vmdk_dir, image_id + ".vmdk")
 
-        @utils.synchronized(vmdk_path)
+        image_info = self.get_image_info(context, image_id)
+        disk_format = image_info.get("disk_format")
+
+        base_vmdk_dir = self._pathutils.get_base_vmdk_dir()
+        image_path = os.path.join(base_vmdk_dir, image_id + "." + disk_format)
+
+        @utils.synchronized(image_path)
         def fetch_image_if_not_existing():
-            if not self._pathutils.exists(vmdk_path):
+            if not self._pathutils.exists(image_path):
                 try:
-                    images.fetch(context, image_id, vmdk_path,
+                    images.fetch(context, image_id, image_path,
                                  user_id, project_id)
                 except Exception:
                     with excutils.save_and_reraise_exception():
-                        if self._pathutils.exists(vmdk_path):
-                            self._pathutils.remove(vmdk_path)
+                        if self._pathutils.exists(image_path):
+                            self._pathutils.remove(image_path)
 
-            return vmdk_path
+            return image_path
 
         return fetch_image_if_not_existing()
