@@ -292,6 +292,7 @@ class VixVM(object):
         _check_job_err_code(err)
         vixlib.Vix_ReleaseHandle(snapshot_handle)
 
+
 class VixConnection(object):
     def __init__(self):
         self._host_type = None
