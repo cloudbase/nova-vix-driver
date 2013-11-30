@@ -116,7 +116,7 @@ kickstart file in a floppy image:
     ISO_IMG_ID=`glance image-show CentOS-64-ks | awk '{if (NR == 9) {print $4}}'`
     FLOPPY_IMG_ID=`glance image-show Kickstart | awk '{if (NR == 9) {print $4}}'`
     
-    qemu-img create -f vmdk empty.vmdk 2G
+    qemu-img create -f vmdk empty.vmdk 10G
     glance image-create --name CentOS-64-template --container-format bare --disk-format vmdk \
     --property hypervisor_type=vix \
     --property vix_tools=linux \
