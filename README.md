@@ -43,7 +43,10 @@ Start nova-compute, making sure to have the Vix dll or shared module in the path
 
     nova-compute --config-file /path/to/your/nova.conf
     
-Note: Since VMware Player does not come with the Vix components, they can be downloaded as part of the
+Note1: On Windows execute with elevated credentials if UAC is enabled. Failing to do so will result in
+having the Vix APIs reporting that virtual machines are powered off even when running.
+
+Note2: Since VMware Player does not come with the Vix components, they can be downloaded as part of the
 Vix SDK: 
 
 https://my.vmware.com/web/vmware/free#desktop_end_user_computing/vmware_player/6_0|PLAYER-600-A|drivers_tools
@@ -93,6 +96,11 @@ If true, instance consoles windows will be displayed in WMware Workstation, Play
     default_guestos=otherLinux64
     
 The guest OS to be used in case a value is not provided by the Glance image.
+
+In the [DEFAULT] section, set the following to true to enable linked clones 
+(not available on VMware Player).
+
+    use_cow_images=true
 
 
 ### Example
