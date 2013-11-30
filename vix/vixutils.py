@@ -321,7 +321,6 @@ class VixSnapshot(object):
 
 class VixConnection(object):
     def __init__(self):
-        self._host_type = None
         self._host_handle = None
         self._software_version = None
         self._host_type = None
