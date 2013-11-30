@@ -16,8 +16,11 @@
 #    under the License.
 
 import os
+import re
 import subprocess
 import sys
+
+from nova.openstack.common.gettextutils import _
 
 from vix import vixutils
 from vix import utils
@@ -50,9 +53,35 @@ class DiskManager(object):
         p = subprocess.Popen(args,
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
-        p.communicate()
+        out, err = p.communicate()
         if p.returncode:
-            raise utils.StackOMatickException("Command failed: %s" % args)
+            raise utils.VixException(_("Command failed: %s") % args)
+
+        return (out, err)
+
+    def get_disk_info(self, disk_path):
+        args = ["qemu-img", "info", disk_path]
+        out, err = self._exec_cmd(args)
+
+        format = None
+        internal_size = None
+        for line in out.split(os.linesep):
+            m = re.match(r"^file format: (.*)$", line)
+            if m:
+                format = m.groups()[0]
+                continue
+            m = re.match(r"^virtual size: .* \((.*) bytes\)$", line)
+            if m:
+                internal_size = long(m.groups()[0])
+                continue
+
+        if not format or internal_size is None:
+            raise utils.VixException(_("Unable to get disk details from: %s")
+                                     % out)
+
+        file_size = os.path.getsize(disk_path)
+
+        return (format, internal_size, file_size)
 
     def _create_disk_qemu(self, disk_path, size_mb, disk_type):
         args = ["qemu-img", "create", "-f", disk_type, disk_path,
