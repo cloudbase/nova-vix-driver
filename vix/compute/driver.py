@@ -26,6 +26,7 @@ from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
 from nova.compute import power_state
 from nova import exception
+from nova import utils as nova_utils
 from nova.virt import driver
 from oslo.config import cfg
 
@@ -57,6 +58,7 @@ CONF.import_opt('use_cow_images', 'nova.virt.driver')
 class VixDriver(driver.ComputeDriver):
     _power_state_map = {
         vixlib.VIX_POWERSTATE_POWERED_ON: power_state.RUNNING,
+        vixlib.VIX_POWERSTATE_POWERING_ON: power_state.RUNNING,
         vixlib.VIX_POWERSTATE_PAUSED: power_state.PAUSED,
         vixlib.VIX_POWERSTATE_SUSPENDED: power_state.SUSPENDED,
         vixlib.VIX_POWERSTATE_POWERED_OFF: power_state.SHUTDOWN,
@@ -81,6 +83,41 @@ class VixDriver(driver.ComputeDriver):
         if self._conn.vm_exists(vmx_path):
             self._conn.unregister_vm_and_delete_files(vmx_path, destroy_disks)
 
+    def _clone_vmdk_vm(self, src_vmdk, root_vmdk_path, dest_vmx_path):
+        src_vmdk_base_path = os.path.splitext(src_vmdk)[0]
+        src_vmx_path = src_vmdk_base_path + ".vmx"
+
+        @nova_utils.synchronized(src_vmx_path)
+        def create_base_vmx():
+            if not self._pathutils.exists(src_vmx_path):
+                display_name = os.path.basename(src_vmdk_base_path)
+
+                self._conn.create_vm(vmx_path=src_vmx_path,
+                                     display_name=display_name,
+                                     guest_os="otherLinux64",
+                                     disk_paths=[src_vmdk])
+        create_base_vmx()
+
+        self._conn.clone_vm(src_vmx_path, dest_vmx_path, True)
+
+        # The cloned VM vmdk name differs from the standard naming
+        # (e.g. root.vmdk). Rename the disk and update the
+        # configuration files
+        vmdk_filename = self._conn.get_vmx_value(dest_vmx_path,
+                                                 "scsi0:0.fileName")
+        vm_dir = os.path.dirname(dest_vmx_path)
+        vmdk_path = os.path.join(vm_dir, vmdk_filename)
+
+        self._pathutils.rename(vmdk_path, root_vmdk_path)
+
+        root_vmdk_filename = os.path.basename(root_vmdk_path)
+        self._conn.set_vmx_value(dest_vmx_path, "scsi0:0.fileName",
+                                 root_vmdk_filename)
+
+        dest_vmsd_path = os.path.splitext(dest_vmx_path)[0] + ".vmsd"
+        self._conn.set_vmx_value(dest_vmsd_path, "sentinel0",
+                                 root_vmdk_filename)
+
     def spawn(self, context, instance, image_meta, injected_files,
               admin_password, network_info=None, block_device_info=None):
 
@@ -100,8 +137,13 @@ class VixDriver(driver.ComputeDriver):
                                                                 project_id)
             root_vmdk_path = self._pathutils.get_root_vmdk_path(instance_name)
 
-            # TODO: replace with a linked clone in the CoW case
-            self._pathutils.copy(base_vmdk_path, root_vmdk_path)
+            vmx_path = self._pathutils.get_vmx_path(instance_name)
+
+            if CONF.use_cow_images:
+                #Note Player does not support cloning a VM
+                self._clone_vmdk_vm(base_vmdk_path, root_vmdk_path, vmx_path)
+            else:
+                self._pathutils.copy(base_vmdk_path, root_vmdk_path)
 
             image_info = self._image_cache.get_image_info(
                 context, root_image_id)
@@ -149,19 +191,30 @@ class VixDriver(driver.ComputeDriver):
                 networks.append((vixutils.NETWORK_NAT,
                                  vif['address']))
 
-            vmx_path = self._pathutils.get_vmx_path(instance_name)
-
-            self._conn.create_vm(vmx_path=vmx_path,
-                                 display_name=display_name,
-                                 guest_os=guest_os,
-                                 num_vcpus=instance['vcpus'],
-                                 mem_size_mb=instance['memory_mb'],
-                                 disk_paths=[root_vmdk_path],
-                                 iso_paths=iso_paths,
-                                 floppy_path=floppy_path,
-                                 networks=networks,
-                                 boot_order=boot_order,
-                                 nested_hypervisor=nested_hypervisor)
+            if CONF.use_cow_images:
+                self._conn.update_vm(vmx_path=vmx_path,
+                                     display_name=display_name,
+                                     guest_os=guest_os,
+                                     num_vcpus=instance['vcpus'],
+                                     mem_size_mb=instance['memory_mb'],
+                                     #disk_paths=[root_vmdk_path],
+                                     iso_paths=iso_paths,
+                                     floppy_path=floppy_path,
+                                     networks=networks,
+                                     boot_order=boot_order,
+                                     nested_hypervisor=nested_hypervisor)
+            else:
+                self._conn.create_vm(vmx_path=vmx_path,
+                                     display_name=display_name,
+                                     guest_os=guest_os,
+                                     num_vcpus=instance['vcpus'],
+                                     mem_size_mb=instance['memory_mb'],
+                                     disk_paths=[root_vmdk_path],
+                                     iso_paths=iso_paths,
+                                     floppy_path=floppy_path,
+                                     networks=networks,
+                                     boot_order=boot_order,
+                                     nested_hypervisor=nested_hypervisor)
 
             with self._conn.open_vm(vmx_path) as vm:
                 vm.power_on(CONF.vix.show_gui)
@@ -190,9 +243,9 @@ class VixDriver(driver.ComputeDriver):
     def get_info(self, instance):
         vm_state = self._exec_vm_action(instance,
                                         lambda vm: vm.get_power_state())
-        for power_state in self._power_state_map:
-            if vm_state & power_state:
-                return {'state': self._power_state_map[power_state]}
+        for state in self._power_state_map:
+            if vm_state & state:
+                return {'state': self._power_state_map[state]}
 
     def attach_volume(self, context, connection_info, instance, mountpoint,
                       encryption=None):

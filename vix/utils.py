@@ -55,6 +55,14 @@ def remove_lines(file_name, pattern):
     return found
 
 
+def get_text(file_name, pattern):
+    with open(file_name, 'rb') as f:
+        for s in f.readlines():
+            m = re.match(pattern, s)
+            if m:
+                return m.groups()
+
+
 def replace_text(file_name, pattern, replacement):
     lines = []
     found = False

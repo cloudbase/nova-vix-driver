@@ -342,8 +342,12 @@ class VixConnection(object):
 
         return VixVM(vm_handle)
 
-    def create_vm(self, vmx_path, display_name, guest_os,
-                  virtual_hw_version=10, num_vcpus=1, cores_per_socket=1,
+    def create_vm(self, vmx_path,
+                  display_name,
+                  guest_os,
+                  virtual_hw_version=10,
+                  num_vcpus=1,
+                  cores_per_socket=1,
                   mem_size_mb=1024,
                   disk_paths=None,
                   iso_paths=None,
@@ -417,6 +421,67 @@ class VixConnection(object):
             for k, v in config.items():
                 f.write('.encoding = "UTF-8"' + os.linesep)
                 f.write('%(k)s = "%(v)s"' % {'k': k, 'v': v} + os.linesep)
+
+    def update_vm(self, vmx_path,
+                  display_name=None,
+                  guest_os=None,
+                  virtual_hw_version=None,
+                  num_vcpus=None,
+                  cores_per_socket=None,
+                  mem_size_mb=None,
+                  disk_paths=None,
+                  iso_paths=None,
+                  floppy_path=None,
+                  networks=None,
+                  boot_order=None,
+                  nested_hypervisor=None,
+                  additional_config=None):
+        config = {}
+
+        if display_name:
+            config["displayName"] = display_name
+
+        if guest_os:
+            config["guestOS"] = guest_os
+
+        if virtual_hw_version:
+            config["virtualHW.version"] = str(virtual_hw_version)
+
+        if num_vcpus:
+            config["numvcpus"] = num_vcpus
+
+        if cores_per_socket:
+            config["cpuid.coresPerSocket"] = cores_per_socket
+
+        if mem_size_mb:
+            config["memsize"] = mem_size_mb
+
+        if boot_order:
+            config["bios.bootOrder"] = boot_order
+
+        if disk_paths:
+            config.update(self._get_scsi_config(disk_paths))
+
+        if iso_paths:
+            config.update(self._get_ide_config(iso_paths))
+
+        if floppy_path:
+            config.update(self._get_floppy_config(floppy_path))
+
+        if nested_hypervisor:
+            config.update(self._get_nested_hypervisor_config())
+
+        if networks is not None:
+            config.update(self._get_networs_config(networks))
+
+        if additional_config:
+            config.update(additional_config)
+
+        if networks is not None:
+            self.remove_vmx_value(vmx_path, r"ethernet[\d]+\.[a-zA-Z]+")
+
+        for (k, v) in config.items():
+            self.set_vmx_value(vmx_path, k, v)
 
     def _get_scsi_config(self, disk_paths):
         config = {}
@@ -646,10 +711,10 @@ class VixConnection(object):
 
             return VixVM(cloned_vm_handle)
 
-    def _remove_vmx_value(self, vmx_path, name):
+    def remove_vmx_value(self, vmx_path, name):
         utils.remove_lines(vmx_path, r"^%s\s*=\s*.*$" % name)
 
-    def _set_vmx_value(self, vmx_path, name, value):
+    def set_vmx_value(self, vmx_path, name, value):
         found = utils.replace_text(vmx_path, r"^(%s\s*=\s*)(.*)$" % name,
                                    "\\1\"%s\"" % value)
         if not found:
@@ -657,44 +722,10 @@ class VixConnection(object):
                 f.write("%(name)s = \"%(value)s\"" %
                         {'name': name, 'value': value} + os.linesep)
 
-    def update_vm_config(self, vmx_path, vm_name=None, guest_os=None,
-                         num_vcpus=None, num_vcpu_cores=None, mem_size_mb=None,
-                         networks=None, nested_hypervisor=None,
-                         additional_config=None):
-        config = {}
-
-        import time
-        time.sleep(3)
-
-        if vm_name:
-            config["displayName"] = vm_name
-
-        if guest_os:
-            config["guestOS"] = guest_os
-
-        if num_vcpus:
-            config["numvcpus"] = num_vcpus
-
-        if num_vcpu_cores:
-            config["cpuid.coresPerSocket"] = num_vcpu_cores
-
-        if mem_size_mb:
-            config["memsize"] = mem_size_mb
-
-        if nested_hypervisor:
-            config.update(self._get_nested_hypervisor_config())
-
-        if networks is not None:
-            config.update(self._get_networs_config(networks))
-
-        if additional_config:
-            config.update(additional_config)
-
-        if networks is not None:
-            self._remove_vmx_value(vmx_path, r"ethernet[\d]+\.[a-zA-Z]+")
-
-        for (k, v) in config.items():
-            self._set_vmx_value(vmx_path, k, v)
+    def get_vmx_value(self, vmx_path, name):
+        value = utils.get_text(vmx_path, r"^%s\s*=\s*\"(.*)\"$" % name)
+        if value:
+            return value[0]
 
     def get_software_version(self):
         if not self._software_version:

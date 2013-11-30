@@ -45,6 +45,10 @@ class PathUtils(object):
     def remove(self, path):
         os.remove(path)
 
+    def check_remove(self, path):
+        if self.exists(path):
+            self.remove(path)
+
     def rename(self, src, dest):
         os.rename(src, dest)
 
