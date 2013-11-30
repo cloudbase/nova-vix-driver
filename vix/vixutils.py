@@ -290,7 +290,33 @@ class VixVM(object):
                                  vixlib.VIX_PROPERTY_NONE)
         vixlib.Vix_ReleaseHandle(job_handle)
         _check_job_err_code(err)
-        vixlib.Vix_ReleaseHandle(snapshot_handle)
+
+        return VixSnapshot(snapshot_handle)
+
+    def remove_snapshot(self, snapshot):
+        job_handle = vixlib.VixVM_RemoveSnapshot(self._vm_handle,
+                                                 snapshot._snapshot_handle,
+                                                 0, None, None)
+        err = vixlib.VixJob_Wait(job_handle, vixlib.VIX_PROPERTY_NONE)
+        _check_job_err_code(err)
+
+        snapshot.close()
+
+
+class VixSnapshot(object):
+    def __init__(self, snapshot_handle):
+        self._snapshot_handle = snapshot_handle
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.close()
+
+    def close(self):
+        if self._snapshot_handle:
+            vixlib.Vix_ReleaseHandle(self._snapshot_handle)
+            self._snapshot_handle = None
 
 
 class VixConnection(object):
@@ -386,6 +412,7 @@ class VixConnection(object):
             "softPowerOff": "FALSE",
             "tools.syncTime": "FALSE",
             "hard-disk.hostBuffer": "disabled",
+            "floppy0.present": "FALSE"
         }
 
         config["virtualHW.version"] = str(virtual_hw_version)

@@ -25,6 +25,7 @@ from nova.openstack.common import excutils
 from nova.openstack.common import jsonutils
 from nova.openstack.common import log as logging
 from nova.compute import power_state
+from nova.compute import task_states
 from nova import exception
 from nova import utils as nova_utils
 from nova.virt import driver
@@ -118,8 +119,8 @@ class VixDriver(driver.ComputeDriver):
         self._conn.set_vmx_value(dest_vmsd_path, "sentinel0",
                                  root_vmdk_filename)
 
-    def _check_cow_player(self):
-        if (CONF.use_cow_images and
+    def _check_cow_player(self, cow):
+        if (cow and
                 vixutils.get_vix_host_type() == vixutils.VIX_VMWARE_PLAYER):
             raise NotImplementedError(_("CoW images are not supported on "
                                         "VMware Player. \"use_cow_images\" "
@@ -128,15 +129,32 @@ class VixDriver(driver.ComputeDriver):
     def spawn(self, context, instance, image_meta, injected_files,
               admin_password, network_info=None, block_device_info=None):
 
-        self._check_cow_player()
-
         instance_name = instance['name']
+        root_image_id = instance['image_ref']
+
+        image_info = self._image_cache.get_image_info(
+            context, root_image_id)
+        properties = image_info.get("properties", {})
+
+        guest_os = properties.get("vix_guestos", CONF.vix.default_guestos)
+        nested_hypervisor = properties.get("vix_nested_hypervisor", False)
+        iso_image_ids = properties.get("vix_iso_images", "").split(",")
+        floppy_image_id = properties.get("vix_floppy_image")
+        tools_iso = properties.get("vix_tools_iso")
+        boot_order = properties.get("vix_boot_order", "hdd,cdrom,floppy")
+
+        cow_str = properties.get("cow", str(CONF.use_cow_images))
+        cow = cow_str.lower() in ["true", "1", "yes"]
+
+        LOG.info(_("CoW image: %s" % cow))
+
+        self._check_cow_player(cow)
+
         self._delete_existing_instance(instance_name)
 
         try:
             self._pathutils.create_instance_dir(instance_name)
 
-            root_image_id = instance['image_ref']
             user_id = instance['user_id']
             project_id = instance['project_id']
 
@@ -148,29 +166,19 @@ class VixDriver(driver.ComputeDriver):
 
             vmx_path = self._pathutils.get_vmx_path(instance_name)
 
-            if CONF.use_cow_images:
+            if cow:
                 self._clone_vmdk_vm(base_vmdk_path, root_vmdk_path, vmx_path)
             else:
                 self._pathutils.copy(base_vmdk_path, root_vmdk_path)
 
-            image_info = self._image_cache.get_image_info(
-                context, root_image_id)
-            properties = image_info.get("properties", {})
-
-            guest_os = properties.get("vix_guestos", CONF.vix.default_guestos)
-            nested_hypervisor = properties.get("vix_nested_hypervisor", False)
-            iso_image_ids = properties.get("vix_iso_images", "").split(",")
-            floppy_image_id = properties.get("vix_floppy_image")
-            tools_iso = properties.get("vix_tools_iso")
-            boot_order = properties.get("vix_boot_order", "hdd,cdrom,floppy")
-
             iso_paths = []
             for image_id in iso_image_ids:
-                iso_path = self._image_cache.get_cached_image(context,
-                                                              image_id,
-                                                              user_id,
-                                                              project_id)
-                iso_paths.append(iso_path)
+                if image_id:
+                    iso_path = self._image_cache.get_cached_image(context,
+                                                                  image_id,
+                                                                  user_id,
+                                                                  project_id)
+                    iso_paths.append(iso_path)
 
             if tools_iso:
                 tools_iso_path = os.path.join(self._conn.get_tools_iso_path(),
@@ -199,7 +207,7 @@ class VixDriver(driver.ComputeDriver):
                 networks.append((vixutils.NETWORK_NAT,
                                  vif['address']))
 
-            if CONF.use_cow_images:
+            if cow:
                 self._conn.update_vm(vmx_path=vmx_path,
                                      display_name=display_name,
                                      guest_os=guest_os,
@@ -257,14 +265,14 @@ class VixDriver(driver.ComputeDriver):
 
     def attach_volume(self, context, connection_info, instance, mountpoint,
                       encryption=None):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def detach_volume(self, connection_info, instance, mountpoint,
                       encryption=None):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def get_volume_connector(self, instance):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def _get_host_memory_info(self):
         (total_mem, free_mem) = utils.get_host_memory_info()
@@ -346,7 +354,32 @@ class VixDriver(driver.ComputeDriver):
         pass
 
     def snapshot(self, context, instance, name, update_task_state):
-        pass
+        if (vixutils.get_vix_host_type() == vixutils.VIX_VMWARE_PLAYER):
+            raise NotImplementedError(_("VMware Player does not support "
+                                        "snapshots"))
+
+        # TODO(alexpilotti): Consider raising an exception when a snapshot
+        # of a CoW instance is attemped
+
+        instance_name = instance['name']
+        vmx_path = self._pathutils.get_vmx_path(instance_name)
+
+        update_task_state(task_state=task_states.IMAGE_PENDING_UPLOAD)
+
+        with self._conn.open_vm(vmx_path) as vm:
+            with vm.create_snapshot(name="Nova snapshot") as snapshot:
+                try:
+                    root_vmdk_path = self._pathutils.get_root_vmdk_path(
+                        instance_name)
+
+                    update_task_state(
+                        task_state=task_states.IMAGE_UPLOADING,
+                        expected_state=task_states.IMAGE_PENDING_UPLOAD)
+
+                    self._image_cache.save_glance_image(context, name,
+                                                        root_vmdk_path)
+                finally:
+                    vm.remove_snapshot(snapshot)
 
     def pause(self, instance):
         self._exec_vm_action(instance, lambda vm: vm.pause())
@@ -372,31 +405,31 @@ class VixDriver(driver.ComputeDriver):
     def live_migration(self, context, instance_ref, dest, post_method,
                        recover_method, block_migration=False,
                        migrate_data=None):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def pre_live_migration(self, context, instance, block_device_info,
                            network_info, disk, migrate_data=None):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def post_live_migration_at_destination(self, ctxt, instance_ref,
                                            network_info,
                                            block_migr=False,
                                            block_device_info=None):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def check_can_live_migrate_destination(self, ctxt, instance_ref,
                                            src_compute_info, dst_compute_info,
                                            block_migration=False,
                                            disk_over_commit=False):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def check_can_live_migrate_destination_cleanup(self, ctxt,
                                                    dest_check_data):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def check_can_live_migrate_source(self, ctxt, instance_ref,
                                       dest_check_data):
-        pass
+        raise NotImplementedError(_("Unsupported feature"))
 
     def plug_vifs(self, instance, network_info):
         LOG.debug(_("plug_vifs called"), instance=instance)

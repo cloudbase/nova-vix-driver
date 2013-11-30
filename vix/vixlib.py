@@ -712,6 +712,7 @@ vix.VixVM_RemoveSnapshot.argtypes = [VixHandle, VixHandle,
                                      VixRemoveSnapshotOptions,
                                      ctypes.POINTER(VixEventProc),
                                      ctypes.c_void_p]
+VixVM_RemoveSnapshot = vix.VixVM_RemoveSnapshot
 
 vix.VixVM_RevertToSnapshot.restype = VixHandle
 vix.VixVM_RevertToSnapshot.argtypes = [VixHandle, VixHandle,

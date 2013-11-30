@@ -45,6 +45,16 @@ class ImageCache(object):
                                                                     image_id)
         return image_service.show(context, image_id)
 
+    def save_glance_image(self, context, name, image_vmdk_path):
+        (glance_image_service,
+         image_id) = glance.get_remote_image_service(context, name)
+        image_metadata = {"is_public": False,
+                          "disk_format": "vmdk",
+                          "container_format": "bare",
+                          "properties": {}}
+        with open(image_vmdk_path, 'rb') as f:
+            glance_image_service.update(context, image_id, image_metadata, f)
+
     def get_cached_image(self, context, image_id, user_id, project_id):
 
         image_info = self.get_image_info(context, image_id)

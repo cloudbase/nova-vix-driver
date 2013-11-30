@@ -31,11 +31,6 @@ CONF.import_opt('instances_path', 'nova.compute.manager')
 
 
 class PathUtils(object):
-    def open(self, path, mode):
-        """Wrapper on __builin__.open used to simplify unit testing."""
-        import __builtin__
-        return __builtin__.open(path, mode)
-
     def exists(self, path):
         return os.path.exists(path)
 
