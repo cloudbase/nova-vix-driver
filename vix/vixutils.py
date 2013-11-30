@@ -324,6 +324,7 @@ class VixConnection(object):
         self._host_type = None
         self._host_handle = None
         self._software_version = None
+        self._host_type = None
 
     def __enter__(self):
         self.connect()
@@ -764,8 +765,22 @@ class VixConnection(object):
                 ctypes.byref(version),
                 vixlib.VIX_PROPERTY_NONE)
             _check_job_err_code(err)
-            vixlib.Vix_FreeBuffer(version)
 
             self._software_version = version.value
+            vixlib.Vix_FreeBuffer(version)
 
         return self._software_version
+
+    def get_host_type(self):
+        if not self._host_type:
+            host_type = ctypes.c_int()
+            err = vixlib.Vix_GetProperties(
+                self._host_handle,
+                vixlib.VIX_PROPERTY_HOST_HOSTTYPE,
+                ctypes.byref(host_type),
+                vixlib.VIX_PROPERTY_NONE)
+            _check_job_err_code(err)
+
+            self._host_type = host_type.value
+
+        return self._host_type
