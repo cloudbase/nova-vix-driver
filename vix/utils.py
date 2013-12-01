@@ -53,20 +53,20 @@ def get_free_port():
 def remove_lines(file_name, pattern):
     lines = []
     found = False
-    with open(file_name, 'rb') as f:
+    with open(file_name, 'r') as f:
         for s in f.readlines():
             if re.match(pattern, s):
                 found = True
             else:
                 lines.append(s)
     if found:
-        with open(file_name, 'wb') as f:
+        with open(file_name, 'w') as f:
             f.writelines(lines)
     return found
 
 
 def get_text(file_name, pattern):
-    with open(file_name, 'rb') as f:
+    with open(file_name, 'r') as f:
         for s in f.readlines():
             m = re.match(pattern, s)
             if m:
@@ -76,7 +76,7 @@ def get_text(file_name, pattern):
 def replace_text(file_name, pattern, replacement):
     lines = []
     found = False
-    with open(file_name, 'rb') as f:
+    with open(file_name, 'r') as f:
         for s in f.readlines():
             if re.match(pattern, s):
                 found = True
@@ -85,6 +85,6 @@ def replace_text(file_name, pattern, replacement):
                 new_s = s
             lines.append(new_s)
     if found:
-        with open(file_name, 'wb') as f:
+        with open(file_name, 'w') as f:
             f.writelines(lines)
     return found
