@@ -482,7 +482,7 @@ class VixConnection(object):
             config.update(self._get_floppy_config(floppy_path))
 
         if networks:
-            config.update(self._get_networs_config(networks))
+            config.update(self._get_networks_config(networks))
 
         if nested_hypervisor:
             config.update(self._get_nested_hypervisor_config())
@@ -555,7 +555,7 @@ class VixConnection(object):
         config.update(self._get_vnc_config(vnc_enabled, vnc_port))
 
         if networks is not None:
-            config.update(self._get_networs_config(networks))
+            config.update(self._get_networks_config(networks))
 
         if additional_config:
             config.update(additional_config)
@@ -635,7 +635,7 @@ class VixConnection(object):
         config["vhv.enable"] = "TRUE"
         return config
 
-    def _get_networs_config(self, networks):
+    def _get_networks_config(self, networks):
         config = {}
         i = 0
         for network, mac_address in networks:
