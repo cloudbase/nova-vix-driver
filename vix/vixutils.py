@@ -674,8 +674,12 @@ class VixConnection(object):
             return
 
         pref_file_path = _get_player_preferences_file_path()
-        with open(pref_file_path, 'rb') as f:
-            lines = f.readlines()
+
+        if os.path.exists(pref_file_path):
+            with open(pref_file_path, 'rb') as f:
+                lines = f.readlines()
+        else:
+            lines = []
 
         if sys.platform == 'win32' and os.path.exists(vmx_path):
             vmx_path_norm = win32api.GetLongPathName(vmx_path)
