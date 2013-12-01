@@ -57,12 +57,11 @@ def load_config_file_values(path):
 
 
 def _get_player_preferences_file_path():
-    # TODO: handle Linux case
     if sys.platform == "win32":
         app_data_dir = os.getenv('APPDATA')
         return os.path.join(app_data_dir, "VMWare", "preferences.ini")
     else:
-        raise NotImplementedError()
+        return os.path.expanduser("~/.vmware/preferences")
 
 
 def _get_install_dir():
@@ -74,20 +73,17 @@ def _get_install_dir():
                              " Workstation") as key:
             return _winreg.QueryValueEx(key, "InstallPath")[0]
     else:
-        #TODO: Add Linux support
+        # Does not apply to Linux
         raise NotImplementedError()
 
 
 def get_vix_bin_path():
-    install_dir = _get_install_dir()
-
     if sys.platform == "darwin":
-        return os.path.join(install_dir, "Contents/Library")
+        return os.path.join(_get_install_dir(), "Contents/Library")
     elif sys.platform == "win32":
-        return install_dir
+        return _get_install_dir()
     else:
-        #TODO: Add Linux support
-        raise NotImplementedError()
+        return "/usr/bin"
 
 
 _host_type = None
@@ -115,20 +111,22 @@ def get_vix_host_type():
                         _winreg.HKEY_CLASSES_ROOT,
                         "Installer\\products\\%s" % product_code) as key:
                     product_name = _winreg.QueryValueEx(key, "ProductName")[0]
-
-                if product_name == "VMware Player":
-                    _host_type = vixlib.VIX_SERVICEPROVIDER_VMWARE_PLAYER
-                elif product_name == "VMware Workstation":
-                    _host_type = vixlib.VIX_SERVICEPROVIDER_VMWARE_WORKSTATION
-                else:
-                    raise utils.VixException(_("Unsupported Vix product: %s") %
-                                             product_name)
             except WindowsError:
                 raise utils.VixException(_("Workstation or Player not "
                                            "installed"))
         else:
-            #TODO: Add Linux support
-            raise NotImplementedError()
+            # Linux
+            product_name = vixutils.get_vmx_value('/etc/vmware/config',
+                                                  'product.name')
+
+        if not _host_type:
+            if product_name == "VMware Player":
+                _host_type = vixlib.VIX_SERVICEPROVIDER_VMWARE_PLAYER
+            elif product_name == "VMware Workstation":
+                _host_type = vixlib.VIX_SERVICEPROVIDER_VMWARE_WORKSTATION
+            else:
+                raise utils.VixException(_("Unsupported Vix product: %s") %
+                                         product_name)
 
     return _host_type
 
@@ -773,15 +771,13 @@ class VixConnection(object):
         return vmx_paths
 
     def get_tools_iso_path(self):
-        install_dir = _get_install_dir()
-
         if sys.platform == "darwin":
-            return os.path.join(install_dir, "Contents/Library/isoimages")
+            return os.path.join(_get_install_dir(),
+                                "Contents/Library/isoimages")
         elif sys.platform == "win32":
-            return install_dir
+            return _get_install_dir()
         else:
-            #TODO: Add Linux support
-            raise NotImplementedError()
+            return "/usr/lib/vmware/isoimages"
 
     def nested_virt_support(self):
         # TODO: match with HW capabilities as well
