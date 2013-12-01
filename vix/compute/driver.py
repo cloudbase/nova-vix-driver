@@ -41,7 +41,7 @@ LOG = logging.getLogger(__name__)
 
 vix_opts = [
     cfg.BoolOpt('show_gui',
-                default=True,
+                default=False,
                 help='Shows the instance console in a window when the '
                      'instance is booted'),
     cfg.BoolOpt('default_guestos',
