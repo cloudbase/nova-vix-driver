@@ -667,7 +667,7 @@ class VixConnection(object):
         _check_job_err_code(err)
 
     def _unregister_vm_local(self, vmx_path):
-        #TODO: VMs are not stored in
+        #TODO: VM UI settings are not stored in
         # ~/Library/Preferences/VMware Fusion/preferences
         # Look for possible alternatives
         if sys.platform == "darwin":
