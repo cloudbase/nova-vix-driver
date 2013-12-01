@@ -120,12 +120,15 @@ class VixDriver(driver.ComputeDriver):
         vixutils.set_vmx_value(dest_vmsd_path, "sentinel0",
                                root_vmdk_filename)
 
-    def _check_cow_player(self, cow):
-        if (cow and
-                vixutils.get_vix_host_type() == vixutils.VIX_VMWARE_PLAYER):
-            raise NotImplementedError(_("CoW images are not supported on "
-                                        "VMware Player. \"use_cow_images\" "
-                                        "must be set to false"))
+    def _check_player_compatibility(self, cow):
+        if vixutils.get_vix_host_type() == vixutils.VIX_VMWARE_PLAYER:
+            if cow:
+                raise NotImplementedError(_("CoW images are not supported on "
+                                            "VMware Player. \"use_cow_images\""
+                                            " must be set to false"))
+            if CONF.vnc_enabled:
+                raise NotImplementedError(_("VNC connections are not supported"
+                                            " on VMWare Player"))
 
     def spawn(self, context, instance, image_meta, injected_files,
               admin_password, network_info=None, block_device_info=None):
@@ -149,7 +152,7 @@ class VixDriver(driver.ComputeDriver):
 
         LOG.info(_("CoW image: %s" % cow))
 
-        self._check_cow_player(cow)
+        self._check_player_compatibility(cow)
 
         self._delete_existing_instance(instance_name)
 
