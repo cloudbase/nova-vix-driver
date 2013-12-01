@@ -18,6 +18,8 @@
 import ctypes
 import sys
 
+from nova.openstack.common.gettextutils import _
+
 if sys.platform == 'darwin':
     vixpath = ('/Applications/VMware Fusion.app/Contents/'
                'Frameworks/libvix.dylib')
@@ -26,7 +28,10 @@ elif sys.platform == 'win32':
 else:
     vixpath = 'libvix'
 
-vix = ctypes.CDLL(vixpath)
+try:
+    vix = ctypes.CDLL(vixpath)
+except Exception:
+    raise IOError(_('Cannot load Vix: %s') % vixpath)
 
 VixHandle = ctypes.c_int
 VixHandleType = ctypes.c_int
