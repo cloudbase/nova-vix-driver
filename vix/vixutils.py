@@ -676,46 +676,45 @@ class VixConnection(object):
         pref_file_path = _get_player_preferences_file_path()
 
         if os.path.exists(pref_file_path):
-            with open(pref_file_path, 'rb') as f:
+            with open(pref_file_path, 'r') as f:
                 lines = f.readlines()
-        else:
-            lines = []
 
-        if sys.platform == 'win32' and os.path.exists(vmx_path):
-            vmx_path_norm = win32api.GetLongPathName(vmx_path)
-        else:
-            vmx_path_norm = vmx_path
-        vmx_path_norm = os.path.normcase(os.path.abspath(vmx_path_norm))
+            if sys.platform == 'win32' and os.path.exists(vmx_path):
+                vmx_path_norm = win32api.GetLongPathName(vmx_path)
+            else:
+                vmx_path_norm = vmx_path
+            vmx_path_norm = os.path.normcase(os.path.abspath(vmx_path_norm))
 
-        index = -1
-        for s in lines:
-            m = re.match(r'^pref.mruVM(\d+)\.filename\s*=\s*"(.*)"(\r)?$', s)
-            if m:
-                path = os.path.normcase(os.path.abspath(m.group(2)))
-                if vmx_path_norm == path:
-                    index = int(m.group(1))
-                    break
-
-        if index >= 0:
-            new_lines = []
+            index = -1
             for s in lines:
-                m = re.match(r'^pref.mruVM(\d+)\.([a-zA-Z]+)\s*=' +
-                             r'\s*"(.+)"(\r)?$', s)
-                if not m:
-                    new_lines.append(s)
-                else:
-                    i = int(m.group(1))
-                    if i < index:
-                        new_lines.append(s)
-                    elif i > index:
-                        new_lines.append('pref.mruVM%(i)s.%(k)s = "%(v)s"' %
-                                         {"i": i - 1,
-                                          "k": m.group(2),
-                                          'v': m.group(3)} + os.linesep)
+                m = re.match(r'^pref.mruVM(\d+)\.filename\s*=\s*"(.*)"(\r)?$',
+                             s)
+                if m:
+                    path = os.path.normcase(os.path.abspath(m.group(2)))
+                    if vmx_path_norm == path:
+                        index = int(m.group(1))
+                        break
 
-            with open(pref_file_path, 'wb') as f:
-                for s in new_lines:
-                    f.write(s)
+            if index >= 0:
+                new_lines = []
+                for s in lines:
+                    m = re.match(r'^pref.mruVM(\d+)\.([a-zA-Z]+)\s*=' +
+                                 r'\s*"(.+)"(\r)?$', s)
+                    if not m:
+                        new_lines.append(s)
+                    else:
+                        i = int(m.group(1))
+                        if i < index:
+                            new_lines.append(s)
+                        elif i > index:
+                            new_lines.append('pref.mruVM%(i)s.%(k)s = "%(v)s"'
+                                             % {"i": i - 1,
+                                                "k": m.group(2),
+                                                'v': m.group(3)} + os.linesep)
+
+                with open(pref_file_path, 'w') as f:
+                    for s in new_lines:
+                        f.write(s)
 
     def _unregister_vm_server(self, vmx_path):
         job_handle = vixlib.VixHost_UnregisterVM(self._host_handle, vmx_path,
