@@ -116,8 +116,7 @@ def get_vix_host_type():
                                            "installed"))
         else:
             # Linux
-            product_name = vixutils.get_vmx_value('/etc/vmware/config',
-                                                  'product.name')
+            product_name = get_vmx_value('/etc/vmware/config', 'product.name')
 
         if not _host_type:
             if product_name == "VMware Player":
