@@ -45,7 +45,7 @@ vix_opts = [
                 help='Shows the instance console in a window when the '
                      'instance is booted'),
     cfg.BoolOpt('default_guestos',
-                default="otherLinux64",
+                default="rhel6-64",
                 help='The default guest os to be set in the instance vmx '
                      'file if not specified by the image "vix_guestos" '
                      'property'),
@@ -96,7 +96,7 @@ class VixDriver(driver.ComputeDriver):
 
                 self._conn.create_vm(vmx_path=src_vmx_path,
                                      display_name=display_name,
-                                     guest_os="otherLinux64",
+                                     guest_os="rhel6-64",
                                      disk_paths=[src_vmdk])
         create_base_vmx()
 

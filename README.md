@@ -93,7 +93,7 @@ Options that can be specified in the Nova configuration file in the [vix] sectio
 
 If true, instance consoles windows will be displayed in WMware Workstation, Player or Fusion.
 
-    default_guestos=otherLinux64
+    default_guestos=rhel6-64
 
 The guest OS to be used in case a value is not provided by the Glance image.
 
