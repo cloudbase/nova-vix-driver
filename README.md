@@ -102,6 +102,11 @@ In the [DEFAULT] section, set the following to true to enable linked clones
 
     use_cow_images=true
 
+VNC console access is supported as well on Workstation and Fusion.
+
+    vnc_enabled=True
+    novncproxy_base_url=http://your_proxy_ip:6080/vnc_auto.html
+
 
 ### Example
 
@@ -133,6 +138,4 @@ spawned on other hypervisors.
 ### Limitations
 
 Due to the nature of this project, live-migration is not supported as it wouldn't make particularly sense.
-
-
 
