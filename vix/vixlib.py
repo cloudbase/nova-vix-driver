@@ -26,7 +26,7 @@ if sys.platform == 'darwin':
 elif sys.platform == 'win32':
     vixpath = 'vix.dll'
 else:
-    vixpath = 'libvix'
+    vixpath = 'libvix.so'
 
 try:
     vix = ctypes.CDLL(vixpath)
