@@ -18,6 +18,7 @@
 import multiprocessing
 import psutil
 import re
+import socket
 
 from nova import exception
 
@@ -38,6 +39,15 @@ def get_disk_info(path):
 
 def get_cpu_count():
     return multiprocessing.cpu_count()
+
+
+def get_free_port():
+    sock = socket.socket()
+    try:
+        sock.bind(('', 0))
+        return sock.getsockname()[1]
+    finally:
+        sock.close()
 
 
 def remove_lines(file_name, pattern):

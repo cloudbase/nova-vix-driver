@@ -54,6 +54,7 @@ vix_opts = [
 CONF = cfg.CONF
 CONF.register_opts(vix_opts, 'vix')
 CONF.import_opt('use_cow_images', 'nova.virt.driver')
+CONF.import_opt('vnc_enabled', 'nova.vnc')
 
 
 class VixDriver(driver.ComputeDriver):
@@ -104,20 +105,20 @@ class VixDriver(driver.ComputeDriver):
         # The cloned VM vmdk name differs from the standard naming
         # (e.g. root.vmdk). Rename the disk and update the
         # configuration files
-        vmdk_filename = self._conn.get_vmx_value(dest_vmx_path,
-                                                 "scsi0:0.fileName")
+        vmdk_filename = vixutils.get_vmx_value(dest_vmx_path,
+                                               "scsi0:0.fileName")
         vm_dir = os.path.dirname(dest_vmx_path)
         vmdk_path = os.path.join(vm_dir, vmdk_filename)
 
         self._pathutils.rename(vmdk_path, root_vmdk_path)
 
         root_vmdk_filename = os.path.basename(root_vmdk_path)
-        self._conn.set_vmx_value(dest_vmx_path, "scsi0:0.fileName",
-                                 root_vmdk_filename)
+        vixutils.set_vmx_value(dest_vmx_path, "scsi0:0.fileName",
+                               root_vmdk_filename)
 
         dest_vmsd_path = os.path.splitext(dest_vmx_path)[0] + ".vmsd"
-        self._conn.set_vmx_value(dest_vmsd_path, "sentinel0",
-                                 root_vmdk_filename)
+        vixutils.set_vmx_value(dest_vmsd_path, "sentinel0",
+                               root_vmdk_filename)
 
     def _check_cow_player(self, cow):
         if (cow and
@@ -198,6 +199,11 @@ class VixDriver(driver.ComputeDriver):
             else:
                 floppy_path = None
 
+            if CONF.vnc_enabled:
+                vnc_port = utils.get_free_port()
+            else:
+                vnc_port = None
+
             display_name = instance.get("display_name")
 
             networks = []
@@ -218,6 +224,8 @@ class VixDriver(driver.ComputeDriver):
                                      floppy_path=floppy_path,
                                      networks=networks,
                                      boot_order=boot_order,
+                                     vnc_enabled=CONF.vnc_enabled,
+                                     vnc_port=vnc_port,
                                      nested_hypervisor=nested_hypervisor)
             else:
                 self._conn.create_vm(vmx_path=vmx_path,
@@ -230,6 +238,8 @@ class VixDriver(driver.ComputeDriver):
                                      floppy_path=floppy_path,
                                      networks=networks,
                                      boot_order=boot_order,
+                                     vnc_enabled=CONF.vnc_enabled,
+                                     vnc_port=vnc_port,
                                      nested_hypervisor=nested_hypervisor)
 
             with self._conn.open_vm(vmx_path) as vm:
@@ -462,7 +472,19 @@ class VixDriver(driver.ComputeDriver):
         pass
 
     def get_host_ip_addr(self):
-        pass
+        return CONF.my_ip
+
+    def get_vnc_console(self, instance):
+        vmx_path = self._pathutils.get_vmx_path(instance['name'])
+        with self._conn.open_vm(vmx_path) as vm:
+            vnc_enabled, vnc_port = vm.get_vnc_settings()
+
+        if not vnc_enabled:
+            raise utils.VixException(_("VNC is not enabled for this instance"))
+
+        host = self.get_host_ip_addr()
+
+        return {'host': host, 'port': vnc_port, 'internal_access_path': None}
 
     def get_console_output(self, instance):
         LOG.debug(_("get_console_output called"), instance=instance)

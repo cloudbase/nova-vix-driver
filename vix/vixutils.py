@@ -133,9 +133,29 @@ def get_vix_host_type():
     return _host_type
 
 
+def remove_vmx_value(vmx_path, name):
+    utils.remove_lines(vmx_path, r"^%s\s*=\s*.*$" % name)
+
+
+def set_vmx_value(vmx_path, name, value):
+    found = utils.replace_text(vmx_path, r"^(%s\s*=\s*)(.*)$" % name,
+                               "\\1\"%s\"" % value)
+    if not found:
+        with open(vmx_path, "ab") as f:
+            f.write("%(name)s = \"%(value)s\"" %
+                    {'name': name, 'value': value} + os.linesep)
+
+
+def get_vmx_value(vmx_path, name):
+    value = utils.get_text(vmx_path, r"^%s\s*=\s*\"(.*)\"$" % name)
+    if value:
+        return value[0]
+
+
 class VixVM(object):
     def __init__(self, vm_handle):
         self._vm_handle = vm_handle
+        self._vmx_path = None
 
     def __enter__(self):
         return self
@@ -302,6 +322,36 @@ class VixVM(object):
 
         snapshot.close()
 
+    def get_vmx_path(self):
+        if not self._vmx_path:
+            vmx_path = ctypes.c_char_p()
+            err = vixlib.Vix_GetProperties(
+                self._vm_handle,
+                vixlib.VIX_PROPERTY_VM_VMX_PATHNAME,
+                ctypes.byref(vmx_path),
+                vixlib.VIX_PROPERTY_NONE)
+            _check_job_err_code(err)
+
+            self._vmx_path = vmx_path.value
+            vixlib.Vix_FreeBuffer(vmx_path)
+
+        return self._vmx_path
+
+    def get_vnc_settings(self):
+        vmx_path = self.get_vmx_path()
+
+        vnc_enabled_str = get_vmx_value(vmx_path, "RemoteDisplay.vnc.enabled")
+        vnc_enabled = bool(vnc_enabled_str and
+                           vnc_enabled_str.lower() == "true")
+
+        vnc_port_str = get_vmx_value(vmx_path, "RemoteDisplay.vnc.port")
+        if vnc_port_str:
+            vnc_port = int(vnc_port_str)
+        else:
+            vnc_port = 5900
+
+        return (vnc_enabled, vnc_port)
+
 
 class VixSnapshot(object):
     def __init__(self, snapshot_handle):
@@ -382,6 +432,8 @@ class VixConnection(object):
                   networks=None,
                   boot_order="hdd,cdrom,floppy",
                   nested_hypervisor=False,
+                  vnc_enabled=False,
+                  vnc_port=None,
                   additional_config=None):
 
         config = {
@@ -438,6 +490,8 @@ class VixConnection(object):
         if nested_hypervisor:
             config.update(self._get_nested_hypervisor_config())
 
+        config.update(self._get_vnc_config(vnc_enabled, vnc_port))
+
         if additional_config:
             config.update(additional_config)
 
@@ -463,6 +517,8 @@ class VixConnection(object):
                   networks=None,
                   boot_order=None,
                   nested_hypervisor=None,
+                  vnc_enabled=None,
+                  vnc_port=None,
                   additional_config=None):
         config = {}
 
@@ -499,6 +555,8 @@ class VixConnection(object):
         if nested_hypervisor:
             config.update(self._get_nested_hypervisor_config())
 
+        config.update(self._get_vnc_config(vnc_enabled, vnc_port))
+
         if networks is not None:
             config.update(self._get_networs_config(networks))
 
@@ -506,10 +564,21 @@ class VixConnection(object):
             config.update(additional_config)
 
         if networks is not None:
-            self.remove_vmx_value(vmx_path, r"ethernet[\d]+\.[a-zA-Z]+")
+            remove_vmx_value(vmx_path, r"ethernet[\d]+\.[a-zA-Z]+")
 
         for (k, v) in config.items():
-            self.set_vmx_value(vmx_path, k, v)
+            set_vmx_value(vmx_path, k, v)
+
+    def _get_vnc_config(self, vnc_enabled, vnc_port):
+        config = {}
+        # TODO(alexpilotti): Add vnc password key see:
+        # https://communities.vmware.com/docs/DOC-7535
+        #config["RemoteDisplay.vnc.key"] = vnc_key
+        if vnc_port:
+            config["RemoteDisplay.vnc.port"] = vnc_port
+        if vnc_enabled is not None:
+            config["RemoteDisplay.vnc.enabled"] = bool(vnc_enabled)
+        return config
 
     def _get_scsi_config(self, disk_paths):
         config = {}
@@ -738,22 +807,6 @@ class VixConnection(object):
             _check_job_err_code(err)
 
             return VixVM(cloned_vm_handle)
-
-    def remove_vmx_value(self, vmx_path, name):
-        utils.remove_lines(vmx_path, r"^%s\s*=\s*.*$" % name)
-
-    def set_vmx_value(self, vmx_path, name, value):
-        found = utils.replace_text(vmx_path, r"^(%s\s*=\s*)(.*)$" % name,
-                                   "\\1\"%s\"" % value)
-        if not found:
-            with open(vmx_path, "ab") as f:
-                f.write("%(name)s = \"%(value)s\"" %
-                        {'name': name, 'value': value} + os.linesep)
-
-    def get_vmx_value(self, vmx_path, name):
-        value = utils.get_text(vmx_path, r"^%s\s*=\s*\"(.*)\"$" % name)
-        if value:
-            return value[0]
 
     def get_software_version(self):
         if not self._software_version:
