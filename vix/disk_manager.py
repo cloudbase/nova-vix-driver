@@ -102,7 +102,7 @@ class DiskManager(object):
         self._exec_cmd(args)
 
     def _resize_disk_qemu(self, disk_path, new_size_mb, new_disk_type):
-        tmp_disk_path = "%s.raw" & disk_path
+        tmp_disk_path = "%s.raw" % disk_path
         try:
             args = ["qemu-img", "convert", "-O", DISK_TYPE_RAW, disk_path,
                     tmp_disk_path]
