@@ -48,7 +48,7 @@ class VixUtilsTestCase(unittest.TestCase):
         self._VixVM.close()
 
         vixlib.Vix_ReleaseHandle.assert_called_once()
-        self.assertIsNone(self._VixVM._vm_handle)
+        self.assertTrue(self._VixVM._vm_handle is None)
 
     @mock.patch('vix.vixutils._check_job_err_code')
     def test_get_power_state(self, mock_check_job_err_code):
@@ -416,7 +416,7 @@ class VixUtilsTestCase(unittest.TestCase):
         vixlib.Vix_ReleaseHandle = mock.MagicMock()
         self._VixSnapshot.close()
         vixlib.Vix_ReleaseHandle.assert_called_once()
-        self.assertIsNone(self._VixSnapshot._snapshot_handle)
+        self.assertTrue(self._VixSnapshot._snapshot_handle is None)
 
     ########### TESTING VixConnection CLASS ###########
     @mock.patch('vix.vixutils.VixConnection.delete_vm_files')
@@ -498,7 +498,7 @@ class VixUtilsTestCase(unittest.TestCase):
             ctypes.byref(mock_vm_handle), vixlib.VIX_PROPERTY_NONE)
         vixlib.Vix_ReleaseHandle.assert_called_with(mock_job_handle)
         mock_check_job_err_code.assert_called_with(None)
-        self.assertIsInstance(response, vixutils.VixVM)
+        self.assertTrue(isinstance(response, vixutils.VixVM))
 
     def test_create_vm(self):
         fake_path = 'fake/path'
@@ -813,7 +813,7 @@ class VixUtilsTestCase(unittest.TestCase):
         vixlib.VixHost_Disconnect = mock.MagicMock()
         self._VixConnection.disconnect()
         vixlib.VixHost_Disconnect.assert_called_once()
-        self.assertIsNone(self._VixConnection._host_handle)
+        self.assertTrue(self._VixConnection._host_handle is None)
 
     def test_vm_exists(self):
         fake_path = 'fake/path'
@@ -934,7 +934,7 @@ class VixUtilsTestCase(unittest.TestCase):
         ctypes.byref.assert_called_with(cloned_vm_handle)
         vixlib.Vix_ReleaseHandle.assert_called_with(fake_job_handle)
         mock_check_job_err_code.assert_called_with(None)
-        self.assertIsInstance(response, vixutils.VixVM)
+        self.assertTrue(isinstance(response, vixutils.VixVM))
 
     def test_clone_vm_linked_clone_true(self):
         self._test_clone_vm(linked_clone=True)
